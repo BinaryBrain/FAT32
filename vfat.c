@@ -21,7 +21,7 @@
 struct vfat_data {
 	const char	*dev;
 	int		fs;
-	/* XXX add your code here */
+	struct	fat_boot fb;
 };
 
 struct vfat_data vfat_info;
@@ -46,11 +46,9 @@ static void vfat_init(const char *dev)
 		err(1, "open(%s)", dev);
 	}
 	
-	/* XXX add your code here */
-	struct fat_boot fb;
-	read(vfat_info.fs, &fb, 90);
+	read(vfat_info.fs, &(vfat_info.fb), 90);
 	
-	if(!isFAT32(fb)) {
+	if(!isFAT32(vfat_info.fb)) {
 		err(404, "%s is not a FAT32 system\n", dev);
 	}
 }
