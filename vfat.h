@@ -4,6 +4,12 @@
 
 #include <sys/types.h>
 
+#define DEBUG_PRINT printf
+
+#define bool char
+#define true 1
+#define false 0
+
 struct fat_boot_fat32 {
 	/*36*/	uint32_t	sectors_per_fat;
 	/*40*/	uint16_t	fat_flags;
@@ -79,5 +85,7 @@ struct fat32_direntry_long {
 #define VFAT_LFN_SEQ_START	0x40
 #define VFAT_LFN_SEQ_DELETED	0x80
 #define VFAT_LFN_SEQ_MASK	0x3f
+
+bool isFAT32(struct fat_boot fb);
 
 #endif

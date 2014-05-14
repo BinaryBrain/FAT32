@@ -17,8 +17,6 @@
 
 #include "vfat.h"
 
-#define DEBUG_PRINT printf
-
 // A kitchen sink for all important data about filesystem
 struct vfat_data {
 	const char	*dev;
@@ -33,9 +31,7 @@ uid_t mount_uid;
 gid_t mount_gid;
 time_t mount_time;
 
-
-static void
-vfat_init(const char *dev)
+static void vfat_init(const char *dev)
 {
 	iconv_utf16 = iconv_open("utf-8", "utf-16"); // from utf-16 to utf-8
 	// These are useful so that we can setup correct permissions in the mounted directories
@@ -46,16 +42,51 @@ vfat_init(const char *dev)
 	mount_time = time(NULL);
 
 	vfat_info.fs = open(dev, O_RDONLY);
-	if (vfat_info.fs < 0)
+	if (vfat_info.fs < 0) {
 		err(1, "open(%s)", dev);
-
+	}
+	
 	/* XXX add your code here */
+	struct fat_boot fb;
+	read(vfat_info.fs, &fb, 90);
+	
+	if(!isFAT32(fb)) {
+		err(404, "%s is not a FAT32 system\n", dev);
+	}
 }
 
-/* XXX add your code here */
+bool isFAT32(struct fat_boot fb) {
+	int root_dir_sectors = (fb.root_max_entries*32 + (fb.bytes_per_sector - 1)) / fb.bytes_per_sector;
+	
+	if(root_dir_sectors != 0) {
+		return false;
+	}
+	
+	uint32_t FATSz;
+	uint32_t TotSec;
+	uint32_t DataSec;
+	uint32_t CountofClusters;
+	
+	if(fb.sectors_per_fat_small != 0) {
+		FATSz = fb.sectors_per_fat_small;
+	} else {
+		FATSz = fb.fat32.sectors_per_fat;
+	}
+	
+	if(fb.total_sectors_small != 0) {
+		TotSec = fb.total_sectors_small;
+	} else {
+		TotSec = fb.total_sectors;
+	}
+	
+	DataSec = TotSec - (fb.reserved_sectors + (fb.fat_count * FATSz) + root_dir_sectors);
+	
+	CountofClusters = DataSec / fb.sectors_per_cluster;
+	
+	return CountofClusters >= 65525;
+}
 
-static int
-vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fillerdata)
+static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fillerdata)
 {
 	struct stat st; // we can reuse same stat entry over and over again
 	void *buf = NULL;
@@ -70,7 +101,6 @@ vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fillerdata)
 	/* XXX add your code here */
 }
 
-
 // Used by vfat_search_entry()
 struct vfat_search_data {
 	const char	*name;
@@ -78,10 +108,8 @@ struct vfat_search_data {
 	struct stat	*st;
 };
 
-
 // You can use this in vfat_resolve as a filler function for vfat_readdir
-static int
-vfat_search_entry(void *data, const char *name, const struct stat *st, off_t offs)
+static int vfat_search_entry(void *data, const char *name, const struct stat *st, off_t offs)
 {
 	struct vfat_search_data *sd = data;
 
@@ -95,8 +123,7 @@ vfat_search_entry(void *data, const char *name, const struct stat *st, off_t off
 }
 
 // Recursively find correct file/directory node given the path
-static int
-vfat_resolve(const char *path, struct stat *st)
+static int vfat_resolve(const char *path, struct stat *st)
 {
 	struct vfat_search_data sd;
 
@@ -104,8 +131,7 @@ vfat_resolve(const char *path, struct stat *st)
 }
 
 // Get file attributes
-static int
-vfat_fuse_getattr(const char *path, struct stat *st)
+static int vfat_fuse_getattr(const char *path, struct stat *st)
 {
 	/* XXX: This is example code, replace with your own implementation */
 	DEBUG_PRINT("fuse getattr %s\n", path);
@@ -140,8 +166,7 @@ vfat_fuse_getattr(const char *path, struct stat *st)
 	return -ENOENT;
 }
 
-static int
-vfat_fuse_readdir(const char *path, void *buf,
+static int vfat_fuse_readdir(const char *path, void *buf,
 		  fuse_fill_dir_t filler, off_t offs, struct fuse_file_info *fi)
 {
 	/* XXX: This is example code, replace with your own implementation */
@@ -153,8 +178,7 @@ vfat_fuse_readdir(const char *path, void *buf,
 	return 0;
 }
 
-static int
-vfat_fuse_read(const char *path, char *buf, size_t size, off_t offs,
+static int vfat_fuse_read(const char *path, char *buf, size_t size, off_t offs,
 	       struct fuse_file_info *fi)
 {
 	/* XXX: This is example code, replace with your own implementation */
@@ -168,8 +192,7 @@ vfat_fuse_read(const char *path, char *buf, size_t size, off_t offs,
 }
 
 ////////////// No need to modify anything below this point
-static int
-vfat_opt_args(void *data, const char *arg, int key, struct fuse_args *oargs)
+static int vfat_opt_args(void *data, const char *arg, int key, struct fuse_args *oargs)
 {
 	if (key == FUSE_OPT_KEY_NONOPT && !vfat_info.dev) {
 		vfat_info.dev = strdup(arg);
@@ -184,13 +207,12 @@ static struct fuse_operations vfat_available_ops = {
 	.read = vfat_fuse_read,
 };
 
-int
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
 	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
 	fuse_opt_parse(&args, NULL, NULL, vfat_opt_args);
-
+	
 	if (!vfat_info.dev)
 		errx(1, "missing file system parameter");
 
