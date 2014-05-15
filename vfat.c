@@ -95,6 +95,9 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 	st.st_uid = mount_uid;
 	st.st_gid = mount_gid;
 	st.st_nlink = 1;
+	
+	// Goes through the directory table and calls the fillet function on the
+	// filer data for each entry (usually the filler is vfat_search_entry)
 
 	/* XXX add your code here */
 }
@@ -124,7 +127,9 @@ static int vfat_search_entry(void *data, const char *name, const struct stat *st
 static int vfat_resolve(const char *path, struct stat *st)
 {
 	struct vfat_search_data sd;
-
+	// Calls vfat_readdir with vfat_search_entry as a filler
+	// and a struct vfat_search_data as fillerdata in order
+	// to find each node of the path recursively
 	/* XXX add your code here */
 }
 
@@ -173,6 +178,9 @@ static int vfat_fuse_readdir(const char *path, void *buf,
 	/* XXX add your code here */
 	filler(buf, "a.txt", NULL, 0);
 	filler(buf, "b.txt", NULL, 0);
+	// Calls vfat_resolve to find the first cluster of the directory
+	// we wish to read then uses the filler function on all the files
+	// in the directory table
 	return 0;
 }
 
