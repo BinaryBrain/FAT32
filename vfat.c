@@ -22,6 +22,9 @@ struct vfat_data {
 	const char	*dev;
 	int		fs;
 	struct	fat_boot fb;
+	uint32_t fats_offset;
+	uint32_t clusters_offset;
+	uint32_t cluster_size;
 };
 
 struct vfat_data vfat_info;
@@ -51,6 +54,11 @@ static void vfat_init(const char *dev)
 	if(!isFAT32(vfat_info.fb)) {
 		err(404, "%s is not a FAT32 system\n", dev);
 	}
+	
+	// Helpers
+	vfat_info.fats_offset = vfat_info.fb.reserved_sectors;
+	vfat_info.clusters_offset = vfat_info.fats_offset + (vfat_info.fb.fat32.sectors_per_fat * vfat_info.fb.bytes_per_sector * vfat_info.fb.fat_count);
+	vfat_info.cluster_size = vfat_info.fb.sectors_per_cluster * vfat_info.fb.bytes_per_sector;
 }
 
 bool isFAT32(struct fat_boot fb) {
@@ -86,18 +94,30 @@ bool isFAT32(struct fat_boot fb) {
 
 static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fillerdata)
 {
+	printf("vfat_readdir\n");
+	
 	struct stat st; // we can reuse same stat entry over and over again
 	void *buf = NULL;
 	struct vfat_direntry *e;
 	char *name;
-
+	
+	
+	
+	u_int32_t offset = first_cluster + vfat_info.clusters_offset;
+	
+	lseek(vfat_info.fs, offset, SEEK_SET);
+	struct fat32_direntry dir_entry; 
+	read(vfat_info.fs, &dir_entry, 90);
+	
+	printf("\n---\n%s\n---\n", dir_entry.name);
+	
 	memset(&st, 0, sizeof(st));
 	st.st_uid = mount_uid;
 	st.st_gid = mount_gid;
 	st.st_nlink = 1;
 	
-	// Goes through the directory table and calls the fillet function on the
-	// filer data for each entry (usually the filler is vfat_search_entry)
+	// Goes through the directory table and calls the filler function on the
+	// filler data for each entry (usually the filler is vfat_search_entry)
 	/* XXX add your code here */
 }
 
@@ -132,10 +152,11 @@ static int vfat_resolve(const char *path, struct stat *st)
 	/* XXX add your code here */
 	char* token;
 	token = strtok(path, "/");
-	sd->name = token;
-	sd->found = 0;
+	sd.name = token;
+	sd.found = 0;
 	/*Find first cluster*/
-	vfat_readdir(cluster, vfat_search_entry, sd);
+	//vfat_readdir(cluster, vfat_search_entry, sd);
+	return 0; // TODO
 }
 
 // Get file attributes
@@ -145,6 +166,8 @@ static int vfat_fuse_getattr(const char *path, struct stat *st)
 	DEBUG_PRINT("fuse getattr %s\n", path);
 	// No such file
 	if (strcmp(path, "/")==0) {
+		uint32_t rootAddr = vfat_info.fb.fat32.root_cluster;
+		
 		st->st_dev = 0; // Ignored by FUSE
 		st->st_ino = 0; // Ignored by FUSE unless overridden
 		st->st_mode = S_IRWXU | S_IRWXG | S_IRWXO | S_IFDIR;
