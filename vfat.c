@@ -49,16 +49,19 @@ static void vfat_init(const char *dev)
 		err(1, "open(%s)", dev);
 	}
 	
-	read(vfat_info.fs, &(vfat_info.fb), 90);
+	read(vfat_info.fs, &(vfat_info.fb), 91);
 	
 	if(!isFAT32(vfat_info.fb)) {
 		err(404, "%s is not a FAT32 system\n", dev);
 	}
 	
 	// Helpers
-	vfat_info.fats_offset = vfat_info.fb.reserved_sectors;
+	vfat_info.fats_offset = vfat_info.fb.reserved_sectors * vfat_info.fb.bytes_per_sector;
+	printf("reserved sectors: %d\n", vfat_info.fats_offset);
 	vfat_info.clusters_offset = vfat_info.fats_offset + (vfat_info.fb.fat32.sectors_per_fat * vfat_info.fb.bytes_per_sector * vfat_info.fb.fat_count);
 	vfat_info.cluster_size = vfat_info.fb.sectors_per_cluster * vfat_info.fb.bytes_per_sector;
+	
+	vfat_readdir(vfat_info.fb.fat32.root_cluster, NULL, NULL);
 }
 
 bool isFAT32(struct fat_boot fb) {
@@ -94,6 +97,7 @@ bool isFAT32(struct fat_boot fb) {
 
 static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fillerdata)
 {
+	
 	printf("vfat_readdir\n");
 	
 	struct stat st; // we can reuse same stat entry over and over again
@@ -103,13 +107,13 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 	
 	
 	
-	u_int32_t offset = first_cluster + vfat_info.clusters_offset;
+	u_int32_t offset = first_cluster + vfat_info.clusters_offset - (2 * vfat_info.fb.bytes_per_sector * vfat_info.fb.sectors_per_cluster);
 	
 	lseek(vfat_info.fs, offset, SEEK_SET);
-	struct fat32_direntry dir_entry; 
-	read(vfat_info.fs, &dir_entry, 90);
+	struct fat32_direntry_long dir_entry; 
+	read(vfat_info.fs, &dir_entry, 33);
 	
-	printf("\n---\n%s\n---\n", dir_entry.name);
+	printf("\n---\n%lu\n---\n\n", dir_entry.attr);
 	
 	memset(&st, 0, sizeof(st));
 	st.st_uid = mount_uid;

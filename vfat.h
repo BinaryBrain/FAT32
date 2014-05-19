@@ -87,5 +87,13 @@ struct fat32_direntry_long {
 #define VFAT_LFN_SEQ_MASK	0x3f
 
 bool isFAT32(struct fat_boot fb);
+static void vfat_init(const char *dev);
+static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fillerdata);
+static int vfat_search_entry(void *data, const char *name, const struct stat *st, off_t offs);
+static int vfat_resolve(const char *path, struct stat *st);
+static int vfat_fuse_getattr(const char *path, struct stat *st);
+static int vfat_fuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offs, struct fuse_file_info *fi);
+static int vfat_fuse_read(const char *path, char *buf, size_t size, off_t offs, struct fuse_file_info *fi);
+static int vfat_opt_args(void *data, const char *arg, int key, struct fuse_args *oargs);
 
 #endif
