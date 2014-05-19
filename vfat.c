@@ -97,7 +97,6 @@ bool isFAT32(struct fat_boot fb) {
 
 static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fillerdata)
 {
-	
 	printf("vfat_readdir\n");
 	
 	struct stat st; // we can reuse same stat entry over and over again
@@ -105,15 +104,13 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 	struct vfat_direntry *e;
 	char *name;
 	
-	
-	
-	u_int32_t offset = first_cluster + vfat_info.clusters_offset - (2 * vfat_info.fb.bytes_per_sector * vfat_info.fb.sectors_per_cluster);
+	u_int32_t offset = (first_cluster * vfat_info.cluster_size) + vfat_info.clusters_offset - (2 * vfat_info.cluster_size);
 	
 	lseek(vfat_info.fs, offset, SEEK_SET);
-	struct fat32_direntry_long dir_entry; 
-	read(vfat_info.fs, &dir_entry, 33);
+	struct fat32_direntry dir_entry; 
+	read(vfat_info.fs, &dir_entry, 32);
 	
-	printf("\n---\n%lu\n---\n\n", dir_entry.attr);
+	printf("\n---\n%s\n---\n\n", dir_entry.name);
 	
 	memset(&st, 0, sizeof(st));
 	st.st_uid = mount_uid;
