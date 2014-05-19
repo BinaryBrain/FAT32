@@ -104,14 +104,6 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 	struct vfat_direntry *e;
 	char *name;
 	
-	u_int32_t offset = (first_cluster * vfat_info.cluster_size) + vfat_info.clusters_offset - (2 * vfat_info.cluster_size);
-	
-	lseek(vfat_info.fs, offset, SEEK_SET);
-	struct fat32_direntry dir_entry; 
-	read(vfat_info.fs, &dir_entry, 32);
-	
-	printf("\n---\n%s\n---\n\n", dir_entry.name);
-	
 	memset(&st, 0, sizeof(st));
 	st.st_uid = mount_uid;
 	st.st_gid = mount_gid;
@@ -120,6 +112,44 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 	// Goes through the directory table and calls the filler function on the
 	// filler data for each entry (usually the filler is vfat_search_entry)
 	/* XXX add your code here */
+	
+	
+	u_int32_t entry_per_cluster = vfat_info.cluster_size/32;
+	
+	//struct fat32_direntry dir_entry;
+	u_int8_t buffer[32];
+	u_int32_t cur_cluster = first_cluster;
+	bool cont = true;
+	while(cont){
+		u_int32_t offset = (cur_cluster-2) * vfat_info.cluster_size + vfat_info.clusters_offset;
+		lseek(vfat_info.fs, offset, SEEK_SET);
+		
+		int i;
+		for(i = 0; i < entry_per_cluster; ++i){
+			read(vfat_info.fs, &buffer, 32);
+			if (buffer[0] != 0xE5 && buffer[0] != 0 && buffer[0] != 0x2E){//ignores . and ..
+				struct fat32_direntry* dir_entry = &buffer;
+				printf("\n---\n");
+				printf("First byte : %d\n", dir_entry->name[0]);
+				printf("Nameext    : %s\n", dir_entry->nameext);
+				printf("Attribute  : %d\n", dir_entry->attr);
+			}
+		}
+		u_int32_t fat_entry_offset = vfat_info.fats_offset + cur_cluster * 4;
+		lseek(vfat_info.fs, fat_entry_offset, SEEK_SET);
+		u_int32_t next_cluster;
+		if(0x0FFFFFF8<=next_cluster<=0x0FFFFFFF){
+			cont = false;
+		} else {
+			cur_cluster = next_cluster;
+		}
+	}
+	/*u_int32_t fat_entry_offset = vfat_info.fats_offset + first_cluster * 4;
+	lseek(vfat_info.fs, fat_entry_offset, SEEK_SET);
+	uint32_t test;
+	read(vfat_info.fs, &test, 4);
+	printf("\n --- \n%d\n --- \n", entry_per_cluster);
+	printf("\n --- \n%d\n --- \n", 0x0FFFFFF8<=test<=0x0FFFFFFF);*/
 }
 
 // Used by vfat_search_entry()
