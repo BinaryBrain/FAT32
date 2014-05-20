@@ -46,6 +46,7 @@ struct vfat_search_data {
 
 static void vfat_init(const char *dev)
 {
+	printf("Mounting filesystem...\n");
 	iconv_utf16 = iconv_open("utf-8", "utf-16"); // from utf-16 to utf-8
 	// These are useful so that we can setup correct permissions in the mounted directories
 	mount_uid = getuid();
@@ -67,7 +68,6 @@ static void vfat_init(const char *dev)
 	
 	// Helpers
 	vfat_info.fats_offset = vfat_info.fb.reserved_sectors * vfat_info.fb.bytes_per_sector;
-	printf("reserved sectors: %d\n", vfat_info.fats_offset);
 	vfat_info.clusters_offset = vfat_info.fats_offset + (vfat_info.fb.fat32.sectors_per_fat * vfat_info.fb.bytes_per_sector * vfat_info.fb.fat_count);
 	vfat_info.cluster_size = vfat_info.fb.sectors_per_cluster * vfat_info.fb.bytes_per_sector;
 	
@@ -116,8 +116,6 @@ bool isFAT32(struct fat_boot fb) {
 
 static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fillerdata, bool searching)
 {
-	printf("vfat_readdir\n");
-	
 	struct stat st; // we can reuse same stat entry over and over again
 	void *buf = NULL;
 	struct vfat_direntry *e;
@@ -270,7 +268,6 @@ static int vfat_resolve(const char *path, struct stat *st)
 	// and a struct vfat_search_data as fillerdata in order
 	// to find each node of the path recursively
 	/* XXX add your code here */
-	printf("---------\n");
 	
 	if (strcmp(path, "/") == 0) {
 		st->st_dev = 0; // Ignored by FUSE
@@ -295,8 +292,6 @@ static int vfat_resolve(const char *path, struct stat *st)
 		token = strtok(p, sep);
 		
 		while(token != NULL) {
-			printf("token: %s\n", token);
-			
 			sd.first_cluster = 0;
 			sd.found = 0;
 			sd.name = token;
@@ -366,7 +361,7 @@ static int set_fuse_attr(struct fat32_direntry* dir_entry, struct stat* st) {
 static int vfat_fuse_getattr(const char *path, struct stat *st)
 {
 	/* XXX: This is example code, replace with your own implementation */
-	DEBUG_PRINT("fuse getattr %s\n", path);
+	//DEBUG_PRINT("fuse getattr %s\n", path);
 	
 	vfat_resolve(path, st);
 	
@@ -390,7 +385,7 @@ static int vfat_fuse_readdir(const char *path, void *buf,
 	vfat_readdir(cluster_offset, filler, buf, false);
 	
 	/* XXX: This is example code, replace with your own implementation */
-	DEBUG_PRINT("fuse readdir %s\n", path);
+	//DEBUG_PRINT("fuse readdir %s\n", path);
 	//assert(offs == 0);
 	/* XXX add your code here */
 	//filler(buf, "a.txt", NULL, 0);
@@ -405,7 +400,7 @@ static int vfat_fuse_read(const char *path, char *buf, size_t size, off_t offs,
 	       struct fuse_file_info *fi)
 {
 	/* XXX: This is example code, replace with your own implementation */
-	DEBUG_PRINT("fuse read %s\n", path);
+	//DEBUG_PRINT("fuse read %s\n", path);
 	assert(size > 1);
 	buf[0] = 'X';
 	buf[1] = 'Y';
