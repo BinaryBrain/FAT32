@@ -17,6 +17,8 @@
 
 #include "vfat.h"
 
+#define MAX_LONGNAME_LENGTH 512
+
 // A kitchen sink for all important data about filesystem
 struct vfat_data {
 	const char	*dev;
@@ -113,7 +115,6 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 	// filler data for each entry (usually the filler is vfat_search_entry)
 	/* XXX add your code here */
 	
-	
 	u_int32_t entry_per_cluster = vfat_info.cluster_size/32;
 	
 	//struct fat32_direntry dir_entry;
@@ -124,15 +125,36 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 		u_int32_t offset = (cur_cluster-2) * vfat_info.cluster_size + vfat_info.clusters_offset;
 		lseek(vfat_info.fs, offset, SEEK_SET);
 		
+		char longname_buffer[MAX_LONGNAME_LENGTH];
+		
 		int i;
 		for(i = 0; i < entry_per_cluster; ++i){
 			read(vfat_info.fs, &buffer, 32);
 			if (buffer[0] != 0xE5 && buffer[0] != 0 && buffer[0] != 0x2E){//ignores . and ..
 				struct fat32_direntry* dir_entry = &buffer;
-				printf("\n---\n");
-				printf("First byte : %d\n", dir_entry->name[0]);
-				printf("Nameext    : %s\n", dir_entry->nameext);
-				printf("Attribute  : %d\n", dir_entry->attr);
+				
+				// long name
+				if(dir_entry->attr == 0x0F) {
+					struct fat32_direntry_long* dir_entry = &buffer;
+					
+					char longname[MAX_LONGNAME_LENGTH];
+					size_t index = get_longname_chunk(dir_entry, longname);
+					longname[index] = 0;
+					
+					printf("\n---\n");
+					printf("Longname : %s\n", longname);
+					printf("Attribute : %d\n", dir_entry->attr);
+					printf("Type  : %d\n", dir_entry->type);
+				}
+				// shortname
+				else {
+					/*
+					printf("\n---\n");
+					printf("First byte : %d\n", dir_entry->name[0]);
+					printf("Nameext    : %s\n", dir_entry->nameext);
+					printf("Attribute  : %d\n", dir_entry->attr);
+					*/
+				}
 			}
 		}
 		u_int32_t fat_entry_offset = vfat_info.fats_offset + cur_cluster * 4;
@@ -152,8 +174,26 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 	printf("\n --- \n%d\n --- \n", 0x0FFFFFF8<=test<=0x0FFFFFFF);*/
 }
 
+size_t get_longname_chunk(struct fat32_direntry_long* dir_entry, char* name) {
+	size_t size1 = 10;
+	size_t size2 = 12;
+	size_t size3 = 4;
+	
+	size_t max = MAX_LONGNAME_LENGTH;
+	
+	char* str1 = (char*) &(dir_entry->name1);
+	char* str2 = (char*) &(dir_entry->name2);
+	char* str3 = (char*) &(dir_entry->name3);
+	
+	iconv(iconv_utf16, &str1, &size1, &name, &max);
+	iconv(iconv_utf16, &str2, &size2, &name, &max);
+	iconv(iconv_utf16, &str3, &size3, &name, &max);
+	
+	return MAX_LONGNAME_LENGTH-max;
+}
+
 // Used by vfat_search_entry()
-struct vfat_search_data { 
+struct vfat_search_data {
 	const char	*name;
 	int		found;
 	struct stat	*st;
