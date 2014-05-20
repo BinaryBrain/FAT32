@@ -357,6 +357,7 @@ static int set_fuse_attr(struct fat32_direntry* dir_entry, struct stat* st) {
 	struct tm a_timeinfo;
 	struct tm m_timeinfo;
 	
+	// Modified
 	m_timeinfo.tm_hour = (dir_entry->mtime_time	& 0b1111100000000000) >> 11;
 	m_timeinfo.tm_min = (dir_entry->mtime_time	& 0b0000011111100000) >> 5;
 	m_timeinfo.tm_sec = (dir_entry->mtime_time	& 0b0000000000011111)*2;
@@ -365,10 +366,12 @@ static int set_fuse_attr(struct fat32_direntry* dir_entry, struct stat* st) {
 	m_timeinfo.tm_mon = ((dir_entry->mtime_date		& 0b0000000111100000) >> 5) - 1;
 	m_timeinfo.tm_mday = dir_entry->mtime_date		& 0b0000000000011111;
 	
+	// Accessed
 	a_timeinfo.tm_year = ((dir_entry->atime_date	& 0b1111111000000000) >> 9) + 1980 - 1900;
 	a_timeinfo.tm_mon = ((dir_entry->atime_date		& 0b0000000111100000) >> 5) - 1;
 	a_timeinfo.tm_mday = dir_entry->atime_date		& 0b0000000000011111;
 	
+	// Created
 	c_timeinfo.tm_hour = (dir_entry->ctime_time	& 0b1111100000000000) >> 11;
 	c_timeinfo.tm_min = (dir_entry->ctime_time	& 0b0000011111100000) >> 5;
 	c_timeinfo.tm_sec = (dir_entry->ctime_time	& 0b0000000000011111) * 2;
