@@ -87,6 +87,7 @@ struct fat32_direntry_long {
 #define VFAT_LFN_SEQ_MASK	0x3f
 
 bool isFAT32(struct fat_boot fb);
+uint8_t compute_csum(char nameext[11]);
 size_t get_longname_chunck(struct fat32_direntry_long* dir_entry, char* name);
 static void vfat_init(const char *dev);
 static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fillerdata, bool searching);

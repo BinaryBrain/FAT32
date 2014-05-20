@@ -19,6 +19,7 @@
 #include "vfat.h"
 
 #define MAX_LONGNAME_LENGTH 512
+#define MAX_LONGNAME_CHUNKS 40
 
 // A kitchen sink for all important data about filesystem
 struct vfat_data {
@@ -58,7 +59,7 @@ static void vfat_init(const char *dev)
 
 	vfat_info.fs = open(dev, O_RDONLY);
 	if (vfat_info.fs < 0) {
-		err(1, "open(%s)", dev);
+		err(1, "open(%s)\n", dev);
 	}
 	
 	read(vfat_info.fs, &(vfat_info.fb), 91);
@@ -104,6 +105,24 @@ bool isFAT32(struct fat_boot fb) {
 	return CountofClusters >= 65525;
 }
 
+uint8_t compute_csum(char nameext[11]) {
+	/*
+	The ASCII value of the first character is the base sum.
+	Rotate the sum bitwise one bit to the right.
+	Add the ASCII value of the next character to the sum.
+	Repeat step 2 and 3 until all 11 characters has been added.
+	*/
+	
+	uint8_t sum = 0;
+	
+	int i;
+	for (i = 0; i < 11; i++) {
+		// NOTE: The operation is an unsigned char rotate right
+		sum = ((sum & 1) ? 0x80 : 0) + (sum >> 1) + nameext[i];
+	}
+	return sum;
+}
+
 static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fillerdata, bool searching)
 {
 	struct stat st; // we can reuse same stat entry over and over again
@@ -126,8 +145,9 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 		u_int32_t offset = (cur_cluster-2) * vfat_info.cluster_size + vfat_info.clusters_offset;
 		lseek(vfat_info.fs, offset, SEEK_SET);
 		
-		char longname[MAX_LONGNAME_LENGTH];
-		longname[0] = 0;
+		char* longname_chunks[MAX_LONGNAME_CHUNKS];
+		uint8_t long_csums[MAX_LONGNAME_CHUNKS];
+		uint32_t longname_chunks_size = 0;
 		
 		int i;
 		for(i = 0; i < entry_per_cluster; ++i){
@@ -142,11 +162,9 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 					size_t index = get_longname_chunck(dir_entry, longname_chunk);
 					longname_chunk[index] = 0;
 					
-					char tmp[MAX_LONGNAME_LENGTH];
-					strcpy(tmp, longname_chunk);
-					strcat(tmp, longname);
-					
-					strcpy(longname, tmp);
+					longname_chunks[longname_chunks_size] = longname_chunk;
+					long_csums[longname_chunks_size] = dir_entry->csum;
+					longname_chunks_size++;
 				}
 				// shortname
 				else {
@@ -154,7 +172,7 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 					
 					char name[MAX_LONGNAME_LENGTH];
 					
-					if(longname[0] == 0) {
+					if(longname_chunks_size == 0) {
 						char nameext[12];
 						
 						if(buffer[0] == 0x05){
@@ -195,7 +213,42 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 						strcpy(name, nameext);
 						name[11] = 0;
 					} else {
-						strcpy(name, longname);
+						// Checksums
+						bool csum_ok = true;
+						uint8_t short_csum = compute_csum(dir_entry->nameext);
+						
+						char longname[MAX_LONGNAME_LENGTH];
+						longname[0] = 0;
+						
+						char tmp[MAX_LONGNAME_LENGTH];
+						
+						int i;
+						for(i = 0; i < longname_chunks_size; i++) {
+							char longname_chunk[MAX_LONGNAME_LENGTH];
+							strcpy(longname_chunk, longname_chunks[i]);
+															
+							uint8_t long_csum = long_csums[i];
+							
+							if(long_csum != short_csum) {
+								csum_ok = false;
+								break;
+							}
+							
+							tmp[0] = 0;
+							strcpy(tmp, longname_chunk);
+							strcat(tmp, longname);
+						}
+						
+						strcpy(longname, tmp);
+						
+						// Take short name is checkcum is wrong in >= 1 chunk.
+						if(csum_ok) {
+							strcpy(name, longname);
+						} else {
+							strcpy(name, dir_entry->nameext);
+							name[12] = 0;
+							printf("Checksum fail on %s\n", name);
+						}
 					}
 					
 					off_t cluster_tot = (searching) ? (dir_entry->cluster_hi << 16) + dir_entry->cluster_lo : 0;
@@ -204,7 +257,7 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 					
 					filler(fillerdata, name, &st, cluster_tot);
 					
-					longname[0] = 0;
+					longname_chunks_size = 0;
 				}
 			}
 		}
