@@ -1,4 +1,4 @@
-// vim: noet:ts=8:sts=8
+	// vim: noet:ts=8:sts=8
 #define FUSE_USE_VERSION 26
 #define _GNU_SOURCE
 
@@ -134,7 +134,7 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 				struct fat32_direntry* dir_entry = &buffer;
 				
 				// long name
-				if(dir_entry->attr == 0x0F) {
+				if(buffer[11] == 0x0F) {
 					struct fat32_direntry_long* dir_entry = &buffer;
 					
 					char longname_chunk[MAX_LONGNAME_LENGTH];
@@ -155,6 +155,13 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 				}
 				// shortname
 				else {
+					struct fat32_direntry* dir_entry = &buffer;
+					char nameext[11];
+					if(buffer[0] == 0x05){
+						
+					} else {
+						nameext = dir_entry->nameext;
+					}
 					if(dir_entry->attr & 0x01) {
 						// Read Only
 					}
