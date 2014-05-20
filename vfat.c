@@ -80,7 +80,7 @@ static void vfat_init(const char *dev)
 
 	// Tests
 	//vfat_readdir(vfat_info.fb.fat32.root_cluster, vfat_search_entry, &sd);
-	//int found = vfat_resolve("/BIGDIR     /File_Nr.1", &st);
+	//int found = vfat_resolve("/deleted file name", &st);
 	//char buf[14];
 	//int res = vfat_fuse_read("/a shortR name", buf, 13, 0, NULL);
 	//buf[13] = 0;
@@ -150,7 +150,7 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 		int i;
 		for(i = 0; i < entry_per_cluster; ++i){
 			read(vfat_info.fs, &buffer, 32);
-			if (buffer[0] != 0xE5 && buffer[0] != 0 && buffer[0] != 0x2E && !(buffer[11] & 0x08) && !(buffer[11] & 0x02) && !(buffer[11] & 0x80) || (buffer[11] == 0x0F)){//ignores . and ..
+			if (buffer[0] != 0xE5 && buffer[0] != 0 && buffer[0] != 0x2E && (!(buffer[11] & 0x08) && !(buffer[11] & 0x02) && !(buffer[11] & 0x80) || (buffer[11] == 0x0F))){//ignores . and ..
 				struct fat32_direntry* dir_entry = &buffer;
 				
 				// long name
@@ -223,6 +223,9 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 						
 					} else {
 						strcpy(name, longname);
+						printf("Long name found : %s\n", name);
+						printf("First byte : %#20x\n", dir_entry->name[0]);
+						printf("Attr : %#20x\n", dir_entry->attr);
 					}
 					
 					
