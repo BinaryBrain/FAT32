@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "vfat.h"
@@ -223,6 +224,9 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 						
 					} else {
 						strcpy(name, longname);
+						printf("Long name found : %s\n", name);
+						printf("First byte : %#20x\n", dir_entry->name[0]);
+						printf("Attr : %#20x\n", dir_entry->attr);
 					}
 					
 					
@@ -358,14 +362,14 @@ static int set_fuse_attr(struct fat32_direntry* dir_entry, struct stat* st) {
 	// st->st_mode = S_IRWXU | S_IRWXG | S_IRWXO | S_IFDIR;
 	st->st_mode = 0;
 	
-	if(dir_entry->attr & 0x01) {
-		// Read Only
-		st->st_mode = st->st_mode | S_IRUSR | S_IRGRP | S_IROTH;
-	} else {
-		// Commented because we mount the FAT32 in read only
-		// st->st_mode = st->st_mode | S_IWUSR | S_IWGRP | S_IWOTH;
-		st->st_mode = st->st_mode | S_IRUSR | S_IRGRP | S_IROTH;
+	if(!(dir_entry->attr & 0x01)) {
+		// Not Read Only
+		st->st_mode = st->st_mode | S_IWUSR;
 	}
+	
+	st->st_mode = st->st_mode | S_IRUSR | S_IRGRP | S_IROTH;
+	st->st_mode = st->st_mode | S_IXUSR | S_IXGRP | S_IXOTH;
+	
 	if(dir_entry->attr & 0x02) {
 		// Hidden File. Should not show in dir listening.
 	}
@@ -384,7 +388,35 @@ static int set_fuse_attr(struct fat32_direntry* dir_entry, struct stat* st) {
 	if(dir_entry->attr & 0x20) {
 		// Archive
 	}
+	
+	struct tm c_timeinfo;
+	struct tm a_timeinfo;
+	struct tm m_timeinfo;
+	
+	m_timeinfo.tm_hour = (dir_entry->mtime_time	& 0b1111100000000000) >> 11;
+	m_timeinfo.tm_min = (dir_entry->mtime_time	& 0b0000011111100000) >> 5;
+	m_timeinfo.tm_sec = (dir_entry->mtime_time	& 0b0000000000011111)*2;
+	
+	m_timeinfo.tm_year = ((dir_entry->mtime_date	& 0b1111111000000000) >> 9) + 1980 - 1900;
+	m_timeinfo.tm_mon = ((dir_entry->mtime_date		& 0b0000000111100000) >> 5) - 1;
+	m_timeinfo.tm_mday = dir_entry->mtime_date		& 0b0000000000011111;
+	
+	a_timeinfo.tm_year = ((dir_entry->atime_date	& 0b1111111000000000) >> 9) + 1980 - 1900;
+	a_timeinfo.tm_mon = ((dir_entry->atime_date		& 0b0000000111100000) >> 5) - 1;
+	a_timeinfo.tm_mday = dir_entry->atime_date		& 0b0000000000011111;
+	
+	c_timeinfo.tm_hour = (dir_entry->ctime_time	& 0b1111100000000000) >> 11;
+	c_timeinfo.tm_min = (dir_entry->ctime_time	& 0b0000011111100000) >> 5;
+	c_timeinfo.tm_sec = (dir_entry->ctime_time	& 0b0000000000011111) * 2;
+	
+	c_timeinfo.tm_year = ((dir_entry->ctime_date	& 0b1111111000000000) >> 9) + 1980;
+	c_timeinfo.tm_mon = (dir_entry->ctime_date		& 0b0000000111100000) >> 5;
+	c_timeinfo.tm_mday = dir_entry->ctime_date		& 0b0000000000011111;
 
+	time_t c_t = mktime(&c_timeinfo);
+	time_t a_t = mktime(&a_timeinfo);
+	time_t m_t = mktime(&m_timeinfo);
+	
 	st->st_dev = 0; // Ignored by FUSE
 	st->st_ino = 0; // Ignored by FUSE unless overridden
 	st->st_nlink = 1;
@@ -394,6 +426,9 @@ static int set_fuse_attr(struct fat32_direntry* dir_entry, struct stat* st) {
 	st->st_size = dir_entry->size;
 	st->st_blksize = 0; // Ignored by FUSE
 	st->st_blocks = 1;
+	st->st_atime = a_t; //time of last access
+	st->st_mtime = m_t; //time of last modification
+	st->st_ctime = c_t; //time of last status change 
 	return 0;
 }
 
