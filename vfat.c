@@ -356,7 +356,7 @@ static int set_fuse_attr(struct fat32_direntry* dir_entry, struct stat* st) {
 	st->st_uid = mount_uid;
 	st->st_gid = mount_gid;
 	st->st_rdev = 0;
-	st->st_size = 0;
+	st->st_size = dir_entry->size;
 	st->st_blksize = 0; // Ignored by FUSE
 	st->st_blocks = 1;
 	return 0;
