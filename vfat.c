@@ -132,7 +132,7 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 		int i;
 		for(i = 0; i < entry_per_cluster; ++i){
 			read(vfat_info.fs, &buffer, 32);
-			if ((((((((buffer[0] != 0xE5) && (buffer[0] != 0)) && (buffer[0] != 0x2E)) && !(buffer[11] & 0x08)) && !(buffer[11] & 0x02)) && !(buffer[11] & 0x80))) || (buffer[11] == 0x0F)){
+			if (buffer[0] != 0xE5 && buffer[0] != 0 && buffer[0] != 0x2E && (!(buffer[11] & 0x08) && !(buffer[11] & 0x02) && !(buffer[11] & 0x80) || (buffer[11] == 0x0F))){
 				
 				// long name
 				if(buffer[11] == 0x0F) {
