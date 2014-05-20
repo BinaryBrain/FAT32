@@ -430,28 +430,32 @@ static int vfat_fuse_read(const char *path, char *buf, size_t size, off_t offs,
 	       struct fuse_file_info *fi)
 {
 	/* XXX: This is example code, replace with your own implementation */
-	assert(size > 1);
+
+	assert(size > 0);
 	
 	struct stat st;
 	int file_cluster = vfat_resolve(path, &st);
 	off_t tmp_offs = offs;
+	size_t rem_size = (offs + size) > st.st_size ? st.st_size - offs : size;
+
 	while(tmp_offs >= vfat_info.cluster_size){
 		tmp_offs -= vfat_info.cluster_size;
 		uint32_t next_cluster_offset = vfat_info.fats_offset + file_cluster * 4;
 		lseek(vfat_info.fs, next_cluster_offset, SEEK_SET);
 		read(vfat_info.fs, &file_cluster, 4);
+		
 		if (0x0FFFFFF8 <= file_cluster && file_cluster <= 0x0FFFFFFF){
 			return 0;
 		}
 	}
 	
-	u_int32_t read_begin = (file_cluster - 2) * vfat_info.cluster_size + vfat_info.clusters_offset + offs;
+	u_int32_t read_begin = (file_cluster - 2) * vfat_info.cluster_size + vfat_info.clusters_offset + tmp_offs;
 	lseek(vfat_info.fs, read_begin, SEEK_SET);
 	size_t read_bytes  = 0;
-	if ( size > (vfat_info.cluster_size - offs) ){
-		read(vfat_info.fs, buf, vfat_info.cluster_size - offs);
-		size_t rem_size = size - (vfat_info.cluster_size - offs);
-		read_bytes = vfat_info.cluster_size - offs;
+	if ( rem_size > (vfat_info.cluster_size - tmp_offs) ){
+		read(vfat_info.fs, buf, vfat_info.cluster_size - tmp_offs);
+		rem_size = rem_size - (vfat_info.cluster_size - tmp_offs);
+		read_bytes = vfat_info.cluster_size - tmp_offs;
 		while(rem_size >= vfat_info.cluster_size){
 			rem_size -= vfat_info.cluster_size;
 			uint32_t next_cluster_offset = vfat_info.fats_offset + file_cluster * 4;
@@ -462,7 +466,7 @@ static int vfat_fuse_read(const char *path, char *buf, size_t size, off_t offs,
 			}
 			read_begin = (file_cluster - 2) * vfat_info.cluster_size + vfat_info.clusters_offset;
 			lseek(vfat_info.fs, read_begin, SEEK_SET);
-			char tmp_buf[size];
+			char tmp_buf[vfat_info.cluster_size];
 			read(vfat_info.fs, tmp_buf, vfat_info.cluster_size);
 			int i;
 			for(i = 0; i < vfat_info.cluster_size; ++i){
@@ -474,23 +478,24 @@ static int vfat_fuse_read(const char *path, char *buf, size_t size, off_t offs,
 		lseek(vfat_info.fs, next_cluster_offset, SEEK_SET);
 		read(vfat_info.fs, &file_cluster, 4);
 		if (0x0FFFFFF8 <= file_cluster && file_cluster <= 0x0FFFFFFF){
-			return -1;
+			return read_bytes;
 		}
 		read_begin = (file_cluster - 2) * vfat_info.cluster_size + vfat_info.clusters_offset;
 		lseek(vfat_info.fs, read_begin, SEEK_SET);
-		char tmp_buf[size];
+		char tmp_buf[rem_size];
 		read(vfat_info.fs, tmp_buf, rem_size);
 		int i;
 		for(i = 0; i < rem_size; ++i){
 			buf[i + read_bytes] = tmp_buf[i];
 		}
-		read_bytes += vfat_info.cluster_size;
+		read_bytes += rem_size;
 	} else {
 		read(vfat_info.fs, buf, size);
+		read_bytes = size;
 	}
 	
 	/* XXX add your code here */
-	return size; // number of bytes read from the file
+	return read_bytes; // number of bytes read from the file
 				 // must be size unless EOF reached, negative for an error 
 }
 
