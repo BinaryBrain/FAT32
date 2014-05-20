@@ -223,9 +223,6 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 						
 					} else {
 						strcpy(name, longname);
-						printf("Long name found : %s\n", name);
-						printf("First byte : %#20x\n", dir_entry->name[0]);
-						printf("Attr : %#20x\n", dir_entry->attr);
 					}
 					
 					
