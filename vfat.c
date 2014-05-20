@@ -292,7 +292,6 @@ static int vfat_resolve(const char *path, struct stat *st)
 		st->st_blocks = 1;
 		return cur_cluster;
 	} else {
-		
 		const char sep[2] = "/";
 		char p[MAX_LONGNAME_LENGTH];
 		
@@ -309,6 +308,11 @@ static int vfat_resolve(const char *path, struct stat *st)
 			vfat_readdir(cur_cluster, vfat_search_entry, &sd, true);
 			
 			cur_cluster = sd.first_cluster;
+			
+			if(sd.found == 0) {
+				return -ENOENT;
+			}
+			
 			token = strtok(NULL, sep);
 		}
 	}
@@ -396,12 +400,13 @@ static int set_fuse_attr(struct fat32_direntry* dir_entry, struct stat* st) {
 static int vfat_fuse_getattr(const char *path, struct stat *st)
 {
 	/* XXX: This is example code, replace with your own implementation */
-	vfat_resolve(path, st);
+	int error = vfat_resolve(path, st);
+	
+	if(error < 0) {
+		return error;
+	}
 	
 	return 0;
-	
-	// TODO
-	//return -ENOENT;
 }
 
 static int vfat_fuse_readdir(const char *path, void *buf,
