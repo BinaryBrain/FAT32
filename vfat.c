@@ -275,7 +275,7 @@ static int vfat_resolve(const char *path, struct stat *st)
 	if (strcmp(path, "/") == 0) {
 		st->st_dev = 0; // Ignored by FUSE
 		st->st_ino = 0; // Ignored by FUSE unless overridden
-		st->st_mode = S_IRWXU | S_IRWXG | S_IRWXO | S_IFDIR;
+		st->st_mode = S_IRUSR | S_IRGRP | S_IROTH | S_IFDIR;
 		st->st_nlink = 1;
 		st->st_uid = mount_uid;
 		st->st_gid = mount_gid;
@@ -327,7 +327,9 @@ static int set_fuse_attr(struct fat32_direntry* dir_entry, struct stat* st) {
 		// Read Only
 		st->st_mode = st->st_mode | S_IRUSR | S_IRGRP | S_IROTH;
 	} else {
-		st->st_mode = st->st_mode | S_IRWXU | S_IRWXG | S_IRWXO;
+		// Commented because we mount the FAT32 in read only
+		// st->st_mode = st->st_mode | S_IWUSR | S_IWGRP | S_IWOTH;
+		st->st_mode = st->st_mode | S_IRUSR | S_IRGRP | S_IROTH;
 	}
 	if(dir_entry->attr & 0x02) {
 		// Hidden File. Should not show in dir listening.
