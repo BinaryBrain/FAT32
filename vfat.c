@@ -138,7 +138,7 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 					struct fat32_direntry_long* dir_entry = &buffer;
 					
 					char longname[MAX_LONGNAME_LENGTH];
-					size_t index = get_longname_chunk(dir_entry, longname);
+					size_t index = get_longname(dir_entry, longname);
 					longname[index] = 0;
 					
 					printf("\n---\n");
@@ -174,7 +174,7 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 	printf("\n --- \n%d\n --- \n", 0x0FFFFFF8<=test<=0x0FFFFFFF);*/
 }
 
-size_t get_longname_chunk(struct fat32_direntry_long* dir_entry, char* name) {
+size_t get_longname(struct fat32_direntry_long* dir_entry, char* name) {
 	size_t size1 = 10;
 	size_t size2 = 12;
 	size_t size3 = 4;
