@@ -417,9 +417,6 @@ static int vfat_fuse_readdir(const char *path, void *buf,
 	
 	vfat_readdir(cluster_offset, filler, buf, false);
 	
-	// TODO
-	//assert(offs == 0);
-	
 	// Calls vfat_resolve to find the first cluster of the directory
 	// we wish to read then uses the filler function on all the files
 	// in the directory table
@@ -430,8 +427,6 @@ static int vfat_fuse_read(const char *path, char *buf, size_t size, off_t offs,
 	       struct fuse_file_info *fi)
 {
 	/* XXX: This is example code, replace with your own implementation */
-	
-	// TODO
 	assert(size > 1);
 	
 	struct stat st;
