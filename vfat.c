@@ -125,7 +125,7 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 		u_int32_t offset = (cur_cluster-2) * vfat_info.cluster_size + vfat_info.clusters_offset;
 		lseek(vfat_info.fs, offset, SEEK_SET);
 		
-		char longname_buffer[MAX_LONGNAME_LENGTH];
+		char longname[MAX_LONGNAME_LENGTH] = "a";
 		
 		int i;
 		for(i = 0; i < entry_per_cluster; ++i){
@@ -137,12 +137,19 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 				if(dir_entry->attr == 0x0F) {
 					struct fat32_direntry_long* dir_entry = &buffer;
 					
-					char longname[MAX_LONGNAME_LENGTH];
-					size_t index = get_longname_chuck(dir_entry, longname);
-					longname[index] = 0;
+					char longname_chunk[MAX_LONGNAME_LENGTH];
+					size_t index = get_longname_chunck(dir_entry, longname_chunk);
+					longname_chunk[index] = 0;
+					
+					char tmp[MAX_LONGNAME_LENGTH];
+					strcpy(tmp, longname_chunk);
+					strcat(tmp, longname);
+					
+					strcpy(longname, tmp);
 					
 					printf("\n---\n");
 					printf("Longname : %s\n", longname);
+					printf("Longname chunk : %s\n", longname_chunk);
 					printf("Attribute : %d\n", dir_entry->attr);
 					printf("Type  : %d\n", dir_entry->type);
 				}
@@ -166,13 +173,15 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 					if(dir_entry->attr & 0x20) {
 						// Archive
 					}
-					
+				
 					/*
 					printf("\n---\n");
 					printf("First byte : %d\n", dir_entry->name[0]);
 					printf("Nameext    : %s\n", dir_entry->nameext);
 					printf("Attribute  : %d\n", dir_entry->attr);
 					*/
+					
+					longname[0] = 0;
 				}
 			}
 		}
@@ -193,7 +202,7 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 	printf("\n --- \n%d\n --- \n", 0x0FFFFFF8<=test<=0x0FFFFFFF);*/
 }
 
-size_t get_longname_chuck(struct fat32_direntry_long* dir_entry, char* name) {
+size_t get_longname_chunck(struct fat32_direntry_long* dir_entry, char* name) {
 	size_t size1 = 10;
 	size_t size2 = 12;
 	size_t size3 = 4;
