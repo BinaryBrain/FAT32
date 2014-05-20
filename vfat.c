@@ -335,13 +335,13 @@ static int set_fuse_attr(struct fat32_direntry* dir_entry, struct stat* st) {
 	st->st_mode = st->st_mode | S_IXUSR | S_IXGRP | S_IXOTH;
 	
 	if(dir_entry->attr & 0x02) {
-		// Hidden File. Should not show in dir listening.
+		// Hidden File. Should not show in dir listening. (Not used)
 	}
 	if(dir_entry->attr & 0x04) {
-		// System. File is Operating system
+		// System. File is Operating system (Not used)
 	}
 	if(dir_entry->attr & 0x08) {
-		// Volume ID.
+		// Volume ID. (Not used)
 	}
 	if(dir_entry->attr & 0x10) {
 		// Directory
@@ -350,7 +350,7 @@ static int set_fuse_attr(struct fat32_direntry* dir_entry, struct stat* st) {
 		st->st_mode = st->st_mode | S_IFREG; // Doesn't handle special files
 	}
 	if(dir_entry->attr & 0x20) {
-		// Archive
+		// Archive (Not used)
 	}
 	
 	struct tm c_timeinfo;
