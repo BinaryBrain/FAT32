@@ -1,0 +1,90 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% University/School Laboratory Report
+% LaTeX Template
+% Version 3.1 (25/3/14)
+%
+% This template has been downloaded from:
+% http://www.LaTeXTemplates.com
+%
+% Original author:
+% Linux and Unix Users Group at Virginia Tech Wiki 
+% (https://vtluug.org/wiki/Example_LaTeX_chem_lab_report)
+%
+% License:
+% CC BY-NC-SA 3.0 (http://creativecommons.org/licenses/by-nc-sa/3.0/)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%----------------------------------------------------------------------------------------
+%	PACKAGES AND DOCUMENT CONFIGURATIONS
+%----------------------------------------------------------------------------------------
+
+\documentclass{article}
+
+\usepackage[version=3]{mhchem} % Package for chemical equation typesetting
+\usepackage{siunitx} % Provides the \SI{}{} and \si{} command for typesetting SI units
+\usepackage{graphicx} % Required for the inclusion of images
+\usepackage{natbib} % Required to change bibliography style to APA
+\usepackage{amsmath} % Required for some math elements 
+
+\setlength\parindent{0pt} % Removes all indentation from paragraphs
+
+\renewcommand{\labelenumi}{\alph{enumi}.} % Make numbering in the enumerate environment by letter rather than number (e.g. section 6)
+
+%\usepackage{times} % Uncomment to use the Times New Roman font
+
+%----------------------------------------------------------------------------------------
+%	DOCUMENT INFORMATION
+%----------------------------------------------------------------------------------------
+
+\title{Operating System\\Assignment 3 : \\ FAT32 File system} % Title
+
+\author{Sacha Allan \textsc{Bron}, J\'er\'emy \textsc{Rabasco}} % Author name
+
+\date{\today} % Date for the report
+
+\begin{document}
+
+\maketitle % Insert the title, author and date
+
+
+% If you wish to include an abstract, uncomment the lines below
+% \begin{abstract}
+% Abstract text
+% \end{abstract}
+
+%----------------------------------------------------------------------------------------
+%	SECTION 1
+%----------------------------------------------------------------------------------------
+
+\section{State of implementation}
+Everything was implemented and should work quite well. IN particular our file system should be able to:
+\begin{itemize}
+\item Check that the volume is really a FAT32 volume
+\item Retrieve and list every entry in a directory while ignoring deleted and hidden files
+\item Read a file
+\item Verify that one don't try to access a file or directory that does not exist
+\item Set correctly the dates of creation, modification and last access to a file
+\item Handle long file names
+\end{itemize}
+
+As far we tested, all these features work.
+\section{Experiences}
+
+\subsection{Documentation}
+
+An important part of the work on this assignment was to learn how the FAT32 File system is organized. We spent time on reading some parts of the Microsoft documentation on FAT, Wikipedia articles about FAT and some websites as StackOverflow for particular problems. The hard thing about this part is that a file system is a complex thing and the precise documentation is long and sometimes hard to read and there are a lot of specific values for each specific case, like the ones for the deleted file, hidden file etc... And to make sure that we understood well, we sometimes read some parts of the provided FAT32 volume (with a C program or an hexadecimal editor) to see ourselves how the values were set.\\
+We also documented ourselves a little about fuse in order to use it well.
+
+\subsection{Implementation}
+
+We chose to use the skeleton you provided us for the implementation. The hardest part of the implementation, is linked with the fact, as mentioned above, that there are many specific values in a lot of bytes that mean a lot of things. This fact forced us to constantly look at the documentation each time we wanted to implement something because each operation on a file system requires to check a lot of values in order to make the right choices to perform the required action.  This makes the process of coding much slower than it could be but it is necessary if one wish to read the file system properly and retrieve the correct informations for fuse.
+
+\subsection{Testing}
+We mainly tested our implementation in  the following ways:
+\begin{itemize}
+\item Calling the function currently being implemented with well chosen argument to see the behavior of the program with some calls to \texttt{printf} to see the state of execution
+\item Exploring the given FAT32 volume with an hexadecimal editor to verify the consistency of the values printed when calling a function
+\item Mounting the volume with our implementation and comparing the result with the one obtained with the \texttt{mount} command of linux (we explored the directories and read the files to see if they were the same in both cases)
+\end{itemize}
+\end{document}
