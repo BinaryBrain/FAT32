@@ -170,21 +170,53 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 					char name[MAX_LONGNAME_LENGTH];
 					
 					if(longname[0] == 0) {
-						char nameext[11];
+						char nameext[12];
 						
 						if(buffer[0] == 0x05){
 							nameext[0] = 0xE5;
 						} else {
-							nameext[0] = dir_entry->nameext[0];
+							nameext[0] = dir_entry->name[0];
 						}
 						
 						int i;
-						for(i = 1; i < 11; ++i){
-							nameext[i] = dir_entry->nameext[i];
+						for(i = 1; i < 8; ++i){
+							nameext[i] = dir_entry->name[i];
 						}
-						
+						if(dir_entry->ext[0] != (char) 32 || dir_entry->ext[0] != (char) 32 || dir_entry->ext[0] != (char) 32){
+							i=0;
+							while(i < 8 && nameext[i] != (char) 32){
+								i++;
+							}
+							nameext[i] = '.';
+							int ext_offs = i+1;
+							int pos_first_32 = 0;
+							for(i=0; i<3; ++i){
+								if (dir_entry->ext[i] != (char) 32){
+									nameext[i+ext_offs] = dir_entry->ext[i];
+									//printf("\n%d\n", dir_entry->ext[i]);
+								} else {
+									pos_first_32 = i;
+									i=3;
+								}
+							}
+							int pos_null_char = pos_first_32 == 0 ? i : pos_first_32;
+							//printf("\n%d\n", pos_null_char+ext_offs);
+							nameext[pos_null_char+ext_offs] = 0;
+						} else {
+							i=0;
+							while(i < 8 && nameext[i] != (char) 32){
+								i++;
+							}
+							nameext[i] = 0;
+						}
 						strcpy(name, nameext);
 						name[11] = 0;
+						/*printf("%s :", name);
+						for(i = 0; i<11;++i){
+							printf("%d|", name[i]);
+						}
+						printf("\n");*/
+						
 					} else {
 						strcpy(name, longname);
 					}
