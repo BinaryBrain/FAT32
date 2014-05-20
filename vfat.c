@@ -36,6 +36,14 @@ uid_t mount_uid;
 gid_t mount_gid;
 time_t mount_time;
 
+// Used by vfat_search_entry()
+struct vfat_search_data {
+	const char	*name;
+	int		found;
+	off_t first_cluster;
+	struct stat	*st;
+};
+
 static void vfat_init(const char *dev)
 {
 	iconv_utf16 = iconv_open("utf-8", "utf-16"); // from utf-16 to utf-8
@@ -63,7 +71,16 @@ static void vfat_init(const char *dev)
 	vfat_info.clusters_offset = vfat_info.fats_offset + (vfat_info.fb.fat32.sectors_per_fat * vfat_info.fb.bytes_per_sector * vfat_info.fb.fat_count);
 	vfat_info.cluster_size = vfat_info.fb.sectors_per_cluster * vfat_info.fb.bytes_per_sector;
 	
-	vfat_readdir(vfat_info.fb.fat32.root_cluster, NULL, NULL);
+	struct vfat_search_data sd;
+	sd.name = "sd.name";
+	sd.found = 0;
+	sd.first_cluster = 0;
+	
+	struct stat st;
+
+	// Tests
+	//vfat_readdir(vfat_info.fb.fat32.root_cluster, vfat_search_entry, &sd);
+	//int found = vfat_resolve("/hi", &st);
 }
 
 bool isFAT32(struct fat_boot fb) {
@@ -97,7 +114,7 @@ bool isFAT32(struct fat_boot fb) {
 	return CountofClusters >= 65525;
 }
 
-static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fillerdata)
+static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fillerdata, bool searching)
 {
 	printf("vfat_readdir\n");
 	
@@ -125,7 +142,8 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 		u_int32_t offset = (cur_cluster-2) * vfat_info.cluster_size + vfat_info.clusters_offset;
 		lseek(vfat_info.fs, offset, SEEK_SET);
 		
-		char longname[MAX_LONGNAME_LENGTH] = "a";
+		char longname[MAX_LONGNAME_LENGTH];
+		longname[0] = 0;
 		
 		int i;
 		for(i = 0; i < entry_per_cluster; ++i){
@@ -146,51 +164,47 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 					strcat(tmp, longname);
 					
 					strcpy(longname, tmp);
-					
-					printf("\n---\n");
-					printf("Longname : %s\n", longname);
-					printf("Longname chunk : %s\n", longname_chunk);
-					printf("Attribute : %d\n", dir_entry->attr);
-					printf("Type  : %d\n", dir_entry->type);
 				}
 				// shortname
 				else {
 					struct fat32_direntry* dir_entry = &buffer;
-					char nameext[11];
-					if(buffer[0] == 0x05){
-						nameext[0] = 0xE5;
+					
+					char name[MAX_LONGNAME_LENGTH];
+					
+					if(longname[0] == 0) {
+						char nameext[11];
+						
+						if(buffer[0] == 0x05){
+							nameext[0] = 0xE5;
+						} else {
+							nameext[0] = dir_entry->nameext[0];
+						}
+						
+						int i;
+						for(i = 1; i < 11; ++i){
+							nameext[i] = dir_entry->nameext[i];
+						}
+						
+						strcpy(name, nameext);
+						name[11] = 0;
 					} else {
-						nameext[0] = dir_entry->nameext[0];
+						strcpy(name, longname);
 					}
-					int i;
-					for(i = 1; i < 11; ++i){
-						nameext[i] = dir_entry->nameext[i];
-					}
-					if(dir_entry->attr & 0x01) {
-						// Read Only
-					}
-					if(dir_entry->attr & 0x02) {
-						// Hidden File. Should not show in dir listening.
-					}
-					if(dir_entry->attr & 0x04) {
-						// System. File is Operating system
-					}
-					if(dir_entry->attr & 0x08) {
-						// Volume ID.
-					}
-					if(dir_entry->attr & 0x10) {
-						// Directory
-					}
-					if(dir_entry->attr & 0x20) {
-						// Archive
-					}
-				
-					/*
-					printf("\n---\n");
-					printf("First byte : %d\n", dir_entry->name[0]);
-					printf("Nameext    : %s\n", dir_entry->nameext);
-					printf("Attribute  : %d\n", dir_entry->attr);
-					*/
+					
+					
+					/*printf("\n---\n");
+					printf("Name : %s\n", name);
+					//printf("Longname chunk : %s\n", longname_chunk);
+					printf("Attribute : %d\n", dir_entry->attr);
+					//printf("Type  : %d\n", dir_entry->type);*/
+					
+					off_t cluster_tot = (searching) ? (dir_entry->cluster_hi << 16) + dir_entry->cluster_lo : 0;
+					
+					//printf("CLUSTER: %d, %d, %d, %d\n\n", dir_entry->cluster_hi, dir_entry->cluster_hi << 16, dir_entry->cluster_lo, cluster_tot); 
+					
+					set_fuse_attr(dir_entry, &st);
+					
+					filler(fillerdata, name, &st, cluster_tot);
 					
 					longname[0] = 0;
 				}
@@ -231,13 +245,6 @@ size_t get_longname_chunck(struct fat32_direntry_long* dir_entry, char* name) {
 	return MAX_LONGNAME_LENGTH-max;
 }
 
-// Used by vfat_search_entry()
-struct vfat_search_data {
-	const char	*name;
-	int		found;
-	struct stat	*st;
-};
-
 // You can use this in vfat_resolve as a filler function for vfat_readdir
 static int vfat_search_entry(void *data, const char *name, const struct stat *st, off_t offs)
 {
@@ -245,10 +252,11 @@ static int vfat_search_entry(void *data, const char *name, const struct stat *st
 
 	if (strcmp(sd->name, name) != 0)
 		return (0);
-
+	
 	sd->found = 1;
-	*sd->st = *st;
-
+	sd->first_cluster = offs;
+	*(sd->st) = *st;
+	
 	return (1);
 }
 
@@ -256,28 +264,15 @@ static int vfat_search_entry(void *data, const char *name, const struct stat *st
 static int vfat_resolve(const char *path, struct stat *st)
 {
 	struct vfat_search_data sd;
+	sd.st = st;
+	uint32_t cur_cluster = vfat_info.fb.fat32.root_cluster;
 	// Calls vfat_readdir with vfat_search_entry as a filler
 	// and a struct vfat_search_data as fillerdata in order
 	// to find each node of the path recursively
 	/* XXX add your code here */
-	char* token;
-	token = strtok(path, "/");
-	sd.name = token;
-	sd.found = 0;
-	/*Find first cluster*/
-	//vfat_readdir(cluster, vfat_search_entry, sd);
-	return 0; // TODO
-}
-
-// Get file attributes
-static int vfat_fuse_getattr(const char *path, struct stat *st)
-{
-	/* XXX: This is example code, replace with your own implementation */
-	DEBUG_PRINT("fuse getattr %s\n", path);
-	// No such file
-	if (strcmp(path, "/")==0) {
-		uint32_t rootAddr = vfat_info.fb.fat32.root_cluster;
-		
+	printf("---------\n");
+	
+	if (strcmp(path, "/") == 0) {
 		st->st_dev = 0; // Ignored by FUSE
 		st->st_ino = 0; // Ignored by FUSE unless overridden
 		st->st_mode = S_IRWXU | S_IRWXG | S_IRWXO | S_IFDIR;
@@ -288,38 +283,119 @@ static int vfat_fuse_getattr(const char *path, struct stat *st)
 		st->st_size = 0;
 		st->st_blksize = 0; // Ignored by FUSE
 		st->st_blocks = 1;
-		return 0;
+		return cur_cluster;
+	} else {
+		
+		const char sep[2] = "/";
+		char p[MAX_LONGNAME_LENGTH];
+		
+		strcpy(p, path);
+		
+		char* token;
+		token = strtok(p, sep);
+		
+		while(token != NULL) {
+			printf("token: %s\n", token);
+			
+			sd.first_cluster = 0;
+			sd.found = 0;
+			sd.name = token;
+			
+			vfat_readdir(cur_cluster, vfat_search_entry, &sd, true);
+			
+			cur_cluster = sd.first_cluster;
+			token = strtok(NULL, sep);
+			
+			//sd.name = token;
+			//sd.found = 0;
+			/*Find first cluster*/
+			//vfat_readdir(cluster, vfat_search_entry, sd);
+		}
 	}
-	if (strcmp(path, "/a.txt")==0 || strcmp(path, "/b.txt")==0) {
-		st->st_dev = 0; // Ignored by FUSE
-		st->st_ino = 0; // Ignored by FUSE unless overridden
-		st->st_mode = S_IRWXU | S_IRWXG | S_IRWXO | S_IFREG;
-		st->st_nlink = 1;
-		st->st_uid = mount_uid;
-		st->st_gid = mount_gid;
-		st->st_rdev = 0;
-		st->st_size = 10;
-		st->st_blksize = 0; // Ignored by FUSE
-		st->st_blocks = 1;
-		return 0;
+	
+	return cur_cluster;
+}
+
+static int set_fuse_attr(struct fat32_direntry* dir_entry, struct stat* st) {
+	bool isDir = false;
+	bool isFile = false;
+	
+	// st->st_mode = S_IRWXU | S_IRWXG | S_IRWXO | S_IFDIR;
+	st->st_mode = 0;
+	
+	if(dir_entry->attr & 0x01) {
+		// Read Only
+		st->st_mode = st->st_mode | S_IRUSR | S_IRGRP | S_IROTH;
+	} else {
+		st->st_mode = st->st_mode | S_IRWXU | S_IRWXG | S_IRWXO;
+	}
+	if(dir_entry->attr & 0x02) {
+		// Hidden File. Should not show in dir listening.
+	}
+	if(dir_entry->attr & 0x04) {
+		// System. File is Operating system
+	}
+	if(dir_entry->attr & 0x08) {
+		// Volume ID.
+	}
+	if(dir_entry->attr & 0x10) {
+		// Directory
+		st->st_mode = st->st_mode | S_IFDIR;
+	} else {
+		st->st_mode = st->st_mode | S_IFREG; // Doesn't handle special files
+	}
+	if(dir_entry->attr & 0x20) {
+		// Archive
 	}
 
-	return -ENOENT;
+	st->st_dev = 0; // Ignored by FUSE
+	st->st_ino = 0; // Ignored by FUSE unless overridden
+	st->st_nlink = 1;
+	st->st_uid = mount_uid;
+	st->st_gid = mount_gid;
+	st->st_rdev = 0;
+	st->st_size = 0;
+	st->st_blksize = 0; // Ignored by FUSE
+	st->st_blocks = 1;
+	return 0;
+}
+
+// Get file attributes
+static int vfat_fuse_getattr(const char *path, struct stat *st)
+{
+	/* XXX: This is example code, replace with your own implementation */
+	DEBUG_PRINT("fuse getattr %s\n", path);
+	
+	vfat_resolve(path, st);
+	
+	return 0;
+	
+	// TODO
+	//return -ENOENT;
 }
 
 static int vfat_fuse_readdir(const char *path, void *buf,
 		  fuse_fill_dir_t filler, off_t offs, struct fuse_file_info *fi)
 {
+	struct stat st;
+	int cluster_offset = vfat_resolve(path, &st);
+	
+	/*if(cluster_offset == 0) {
+		printf("Error: %s file not found", path);
+		return;
+	}*/
+	
+	vfat_readdir(cluster_offset, filler, buf, false);
+	
 	/* XXX: This is example code, replace with your own implementation */
 	DEBUG_PRINT("fuse readdir %s\n", path);
 	//assert(offs == 0);
 	/* XXX add your code here */
-	filler(buf, "a.txt", NULL, 0);
-	filler(buf, "b.txt", NULL, 0);
+	//filler(buf, "a.txt", NULL, 0);
+	//filler(buf, "b.txt", NULL, 0);
 	// Calls vfat_resolve to find the first cluster of the directory
 	// we wish to read then uses the filler function on all the files
 	// in the directory table
-	// vfat_resolve(path, NULL); //does not work now
 	return 0;
 }
 
