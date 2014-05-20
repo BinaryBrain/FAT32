@@ -148,6 +148,25 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 				}
 				// shortname
 				else {
+					if(dir_entry.attr & 0x01) {
+						// Read Only
+					}
+					if(dir_entry.attr & 0x02) {
+						// Hidden File. Should not show in dir listening.
+					}
+					if(dir_entry.attr & 0x04) {
+						// System. File is Operating system
+					}
+					if(dir_entry.attr & 0x08) {
+						// Volume ID.
+					}
+					if(dir_entry.attr & 0x10) {
+						// Directory
+					}
+					if(dir_entry.attr & 0x20) {
+						// Archive
+					}
+					
 					/*
 					printf("\n---\n");
 					printf("First byte : %d\n", dir_entry->name[0]);
@@ -160,7 +179,7 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 		u_int32_t fat_entry_offset = vfat_info.fats_offset + cur_cluster * 4;
 		lseek(vfat_info.fs, fat_entry_offset, SEEK_SET);
 		u_int32_t next_cluster;
-		if(0x0FFFFFF8<=next_cluster<=0x0FFFFFFF){
+		if(0x0FFFFFF8 <= next_cluster < =0x0FFFFFFF){
 			cont = false;
 		} else {
 			cur_cluster = next_cluster;
