@@ -71,13 +71,6 @@ static void vfat_init(const char *dev)
 	vfat_info.fats_offset = vfat_info.fb.reserved_sectors * vfat_info.fb.bytes_per_sector;
 	vfat_info.clusters_offset = vfat_info.fats_offset + (vfat_info.fb.fat32.sectors_per_fat * vfat_info.fb.bytes_per_sector * vfat_info.fb.fat_count);
 	vfat_info.cluster_size = vfat_info.fb.sectors_per_cluster * vfat_info.fb.bytes_per_sector;
-	
-	struct vfat_search_data sd;
-	sd.name = "sd.name";
-	sd.found = 0;
-	sd.first_cluster = 0;
-	
-	struct stat st;
 }
 
 bool isFAT32(struct fat_boot fb) {
@@ -114,9 +107,6 @@ bool isFAT32(struct fat_boot fb) {
 static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fillerdata, bool searching)
 {
 	struct stat st; // we can reuse same stat entry over and over again
-	void *buf = NULL;
-	struct vfat_direntry *e;
-	char *name;
 	
 	memset(&st, 0, sizeof(st));
 	st.st_uid = mount_uid;
@@ -142,8 +132,7 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 		int i;
 		for(i = 0; i < entry_per_cluster; ++i){
 			read(vfat_info.fs, &buffer, 32);
-			if (buffer[0] != 0xE5 && buffer[0] != 0 && buffer[0] != 0x2E && (!(buffer[11] & 0x08) && !(buffer[11] & 0x02) && !(buffer[11] & 0x80) || (buffer[11] == 0x0F))){//ignores . and ..
-				struct fat32_direntry* dir_entry = &buffer;
+			if ((((((((buffer[0] != 0xE5) && (buffer[0] != 0)) && (buffer[0] != 0x2E)) && !(buffer[11] & 0x08)) && !(buffer[11] & 0x02)) && !(buffer[11] & 0x80))) || (buffer[11] == 0x0F)){
 				
 				// long name
 				if(buffer[11] == 0x0F) {
@@ -321,8 +310,6 @@ static int vfat_resolve(const char *path, struct stat *st)
 }
 
 static int set_fuse_attr(struct fat32_direntry* dir_entry, struct stat* st) {
-	bool isDir = false;
-	bool isFile = false;
 	
 	st->st_mode = 0;
 	
