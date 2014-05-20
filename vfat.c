@@ -80,7 +80,7 @@ static void vfat_init(const char *dev)
 
 	// Tests
 	//vfat_readdir(vfat_info.fb.fat32.root_cluster, vfat_search_entry, &sd);
-	//int found = vfat_resolve("/hi", &st);
+	int found = vfat_resolve("/BIGDIR     /File_Nr.1", &st);
 }
 
 bool isFAT32(struct fat_boot fb) {
@@ -211,7 +211,10 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 		u_int32_t fat_entry_offset = vfat_info.fats_offset + cur_cluster * 4;
 		lseek(vfat_info.fs, fat_entry_offset, SEEK_SET);
 		u_int32_t next_cluster;
-		if(0x0FFFFFF8 <= next_cluster <= 0x0FFFFFFF){
+		read(vfat_info.fs, &next_cluster, 4);
+		//printf("Next cluster : %#08x\n", next_cluster);
+		//printf("End of cluster chain ?"
+		if(0x0FFFFFF8 <= next_cluster && next_cluster <= 0x0FFFFFFF){
 			cont = false;
 		} else {
 			cur_cluster = next_cluster;
