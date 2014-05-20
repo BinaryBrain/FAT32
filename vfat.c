@@ -138,7 +138,7 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 					struct fat32_direntry_long* dir_entry = &buffer;
 					
 					char longname[MAX_LONGNAME_LENGTH];
-					size_t index = get_longname(dir_entry, longname);
+					size_t index = get_longname_chuck(dir_entry, longname);
 					longname[index] = 0;
 					
 					printf("\n---\n");
@@ -148,22 +148,22 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 				}
 				// shortname
 				else {
-					if(dir_entry.attr & 0x01) {
+					if(dir_entry->attr & 0x01) {
 						// Read Only
 					}
-					if(dir_entry.attr & 0x02) {
+					if(dir_entry->attr & 0x02) {
 						// Hidden File. Should not show in dir listening.
 					}
-					if(dir_entry.attr & 0x04) {
+					if(dir_entry->attr & 0x04) {
 						// System. File is Operating system
 					}
-					if(dir_entry.attr & 0x08) {
+					if(dir_entry->attr & 0x08) {
 						// Volume ID.
 					}
-					if(dir_entry.attr & 0x10) {
+					if(dir_entry->attr & 0x10) {
 						// Directory
 					}
-					if(dir_entry.attr & 0x20) {
+					if(dir_entry->attr & 0x20) {
 						// Archive
 					}
 					
@@ -179,7 +179,7 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 		u_int32_t fat_entry_offset = vfat_info.fats_offset + cur_cluster * 4;
 		lseek(vfat_info.fs, fat_entry_offset, SEEK_SET);
 		u_int32_t next_cluster;
-		if(0x0FFFFFF8 <= next_cluster < =0x0FFFFFFF){
+		if(0x0FFFFFF8 <= next_cluster <= 0x0FFFFFFF){
 			cont = false;
 		} else {
 			cur_cluster = next_cluster;
@@ -193,7 +193,7 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 	printf("\n --- \n%d\n --- \n", 0x0FFFFFF8<=test<=0x0FFFFFFF);*/
 }
 
-size_t get_longname(struct fat32_direntry_long* dir_entry, char* name) {
+size_t get_longname_chuck(struct fat32_direntry_long* dir_entry, char* name) {
 	size_t size1 = 10;
 	size_t size2 = 12;
 	size_t size3 = 4;
