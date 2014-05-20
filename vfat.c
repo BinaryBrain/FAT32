@@ -158,9 +158,13 @@ static int vfat_readdir(uint32_t first_cluster, fuse_fill_dir_t filler, void *fi
 					struct fat32_direntry* dir_entry = &buffer;
 					char nameext[11];
 					if(buffer[0] == 0x05){
-						
+						nameext[0] = 0xE5;
 					} else {
-						nameext = dir_entry->nameext;
+						nameext[0] = dir_entry->nameext[0];
+					}
+					int i;
+					for(i = 1; i < 11; ++i){
+						nameext[i] = dir_entry->nameext[i];
 					}
 					if(dir_entry->attr & 0x01) {
 						// Read Only
