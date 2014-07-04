@@ -1,4 +1,4 @@
-OS3
-===
+FAT32 Reader
+============
 
-Yay !
+This EPFL project is a FAT32 reader for Linux using FUSE.
